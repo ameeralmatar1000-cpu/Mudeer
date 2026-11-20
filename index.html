@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vault — Password Manager</title>
+<meta name="theme-color" content="#0e1116">
+<!-- Home-screen app support (iOS + Android) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vault">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230e1116'/%3E%3Cg fill='none' stroke='%234f8cff' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='46' y='84' width='88' height='60' rx='12'/%3E%3Cpath d='M66 84V66a24 24 0 0 1 48 0v18'/%3E%3C/g%3E%3C/svg%3E">
+<link id="manifestLink" rel="manifest">
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel-2:#1c2230; --line:#2a3240;
+    --text:#e6edf3; --muted:#8b96a5; --accent:#4f8cff; --accent-2:#6ba0ff;
+    --ok:#3fb950; --warn:#d29922; --danger:#f05d5e; --radius:14px;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%,#18202c 0,var(--bg) 60%);
+    color:var(--text);min-height:100%;display:flex;flex-direction:column;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,textarea,select{font-family:inherit;font-size:15px}
+  .hidden{display:none !important}
+
+  /* ---------- Shared ---------- */
+  .btn{background:var(--accent);color:#fff;padding:11px 16px;border-radius:10px;font-weight:600;font-size:14px;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+  .btn:hover{background:var(--accent-2)}
+  .btn:active{transform:translateY(1px)}
+  .btn.block{width:100%}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.ghost:hover{background:var(--panel-2)}
+  .btn.danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
+  .btn.danger:hover{background:rgba(240,93,94,.12)}
+  .btn.sm{padding:7px 11px;font-size:13px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.3px;text-transform:uppercase}
+  .input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:10px;outline:none;transition:.15s}
+  .input:focus{border-color:var(--accent)}
+  textarea.input{resize:vertical;min-height:70px}
+  .row{display:flex;gap:8px;align-items:center}
+  .muted{color:var(--muted)}
+
+  /* ---------- Lock screen ---------- */
+  .lock-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+  .lock-card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:32px;box-shadow:var(--shadow)}
+  .logo{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
+  .logo svg{width:34px;height:34px}
+  .logo h1{font-size:22px;font-weight:700;letter-spacing:.5px}
+  .lock-sub{text-align:center;color:var(--muted);font-size:14px;margin-bottom:24px}
+  .strength{height:6px;border-radius:4px;background:var(--line);margin-top:8px;overflow:hidden}
+  .strength > i{display:block;height:100%;width:0;transition:.25s;border-radius:4px}
+  .strength-label{font-size:12px;margin-top:6px}
+  .err{color:var(--danger);font-size:13px;margin-top:4px;min-height:16px}
+
+  /* ---------- App ---------- */
+  .app{flex:1;display:flex;flex-direction:column;max-width:860px;width:100%;margin:0 auto;padding:18px}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .topbar .logo{margin:0;justify-content:flex-start}
+  .topbar .logo h1{font-size:18px}
+  .topbar .spacer{flex:1}
+  .syncchip{display:none;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;max-width:180px}
+  .syncchip svg{width:13px;height:13px;flex-shrink:0}
+  .syncchip .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .syncchip.linked{color:var(--ok);border-color:rgba(63,185,80,.4)}
+  .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);transition:.15s}
+  .iconbtn:hover{background:var(--panel-2);color:var(--text)}
+  .iconbtn svg{width:18px;height:18px}
+  .searchbar{display:flex;gap:10px;margin-bottom:14px}
+  .searchbar .input{flex:1}
+  .catbar{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px}
+  .catbar::-webkit-scrollbar{height:0}
+  .catpill{flex-shrink:0;font-size:13px;padding:7px 13px;border-radius:20px;border:1px solid var(--line);color:var(--muted);background:var(--panel);white-space:nowrap;transition:.15s;user-select:none}
+  .catpill:hover{color:var(--text)}
+  .catpill.on{background:rgba(79,140,255,.15);border-color:var(--accent);color:var(--accent-2);font-weight:600}
+  .cat-tag{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--line);padding:3px 9px;border-radius:12px;white-space:nowrap;flex-shrink:0}
+
+  .list{display:flex;flex-direction:column;gap:10px}
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px;transition:.15s;cursor:pointer}
+  .entry:hover{border-color:var(--accent);background:var(--panel-2)}
+  .avatar{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:17px}
+  .entry .meta{flex:1;min-width:0}
+  .entry .meta .t{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .entry .meta .u{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .entry .quick{display:flex;gap:6px;opacity:0;transition:.15s}
+  .entry:hover .quick{opacity:1}
+  @media(hover:none){.entry .quick{opacity:1}}
+
+  .empty{text-align:center;color:var(--muted);padding:60px 20px}
+  .empty svg{width:48px;height:48px;opacity:.4;margin-bottom:12px}
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(5,8,12,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);width:100%;max-width:460px;box-shadow:var(--shadow);max-height:90vh;display:flex;flex-direction:column}
+  .modal header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .modal header h2{font-size:17px;font-weight:700;flex:1}
+  .modal .body{padding:20px;overflow:auto}
+  .modal footer{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between}
+  .pw-input-wrap{position:relative}
+  .pw-input-wrap .input{padding-right:84px}
+  .pw-tools{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;gap:2px}
+  .pw-tools button{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  .pw-tools button:hover{background:var(--panel-2);color:var(--text)}
+  .pw-tools svg{width:16px;height:16px}
+
+  .gen{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:4px}
+  .gen .out{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;word-break:break-all;background:var(--panel);padding:10px;border-radius:8px;border:1px solid var(--line);min-height:40px;display:flex;align-items:center}
+  .gen .ctrl{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted)}
+  .gen .ctrl input[type=range]{flex:1;accent-color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .chip{font-size:12px;padding:6px 10px;border-radius:20px;border:1px solid var(--line);color:var(--muted);user-select:none}
+  .chip.on{background:rgba(79,140,255,.15);border-color:var(--accent);color:var(--accent-2)}
+
+  /* toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:12px;box-shadow:var(--shadow);opacity:0;transition:.25s;z-index:100;font-size:14px;display:flex;align-items:center;gap:8px;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast svg{width:16px;height:16px;color:var(--ok)}
+
+  .menu{position:absolute;right:0;top:46px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:200px;z-index:30}
+  .menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:8px;font-size:14px;color:var(--text);text-align:left}
+  .menu button:hover{background:var(--panel-2)}
+  .menu button svg{width:16px;height:16px;color:var(--muted)}
+  .menu .sep{height:1px;background:var(--line);margin:6px 4px}
+  .pos{position:relative}
+  .copyhint{font-size:12px;color:var(--muted);margin-top:4px}
+  .detail-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .detail-row:last-child{border-bottom:none}
+  .detail-row .dr-label{font-size:12px;color:var(--muted);width:84px;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px}
+  .detail-row .dr-val{flex:1;word-break:break-all;font-size:14px}
+  .detail-row .dr-val.mono{font-family:ui-monospace,Menlo,monospace}
+  .detail-row a{color:var(--accent-2);text-decoration:none}
+  .detail-row a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<!-- ========== LOCK / SETUP SCREEN ========== -->
+<div id="lockScreen" class="lock-wrap">
+  <div class="lock-card">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <h1>VAULT</h1>
+    </div>
+    <p class="lock-sub" id="lockSub">Enter your master password to unlock</p>
+
+    <div class="field">
+      <label id="pwLabel">Master password</label>
+      <input class="input" type="password" id="masterPw" autocomplete="off" placeholder="••••••••••••">
+      <div class="strength hidden" id="strengthBar"><i></i></div>
+      <div class="strength-label hidden" id="strengthLabel"></div>
+    </div>
+
+    <div class="field hidden" id="confirmField">
+      <label>Confirm master password</label>
+      <input class="input" type="password" id="masterPw2" autocomplete="off" placeholder="••••••••••••">
+    </div>
+
+    <div class="err" id="lockErr"></div>
+    <button class="btn block" id="unlockBtn">Unlock</button>
+    <p class="copyhint" id="setupNote" style="margin-top:14px;text-align:center"></p>
+  </div>
+</div>
+
+<!-- ========== MAIN APP ========== -->
+<div id="app" class="app hidden">
+  <div class="topbar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <h1>VAULT</h1>
+    </div>
+    <span class="syncchip" id="syncChip" title="Where your vault is saved">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+      <span class="name"></span>
+    </span>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="addBtn" title="Add entry">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <div class="pos">
+      <button class="iconbtn" id="menuBtn" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+      </button>
+      <div class="menu hidden" id="menu">
+        <button id="linkFileBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12l2 2 4-4"/></svg>Link to a vault file (auto-save)</button>
+        <button id="openFileBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.5l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1Z"/></svg>Open a vault file</button>
+        <div class="sep"></div>
+        <button id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Export encrypted backup</button>
+        <button id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Import backup</button>
+        <button id="changePwBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Change master password</button>
+        <div class="sep"></div>
+        <button id="wipeBtn" style="color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Delete everything</button>
+      </div>
+    </div>
+    <button class="iconbtn" id="lockBtn" title="Lock now">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </button>
+  </div>
+
+  <div class="searchbar">
+    <input class="input" id="search" placeholder="Search by name or username…" autocomplete="off">
+  </div>
+
+  <div class="catbar hidden" id="catbar"></div>
+
+  <div class="list" id="list"></div>
+
+  <div class="empty hidden" id="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <p id="emptyText">Your vault is empty.<br>Tap <b>+</b> to add your first login.</p>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".vault,.json,application/json" class="hidden">
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   VAULT — a local, zero-knowledge password manager
+   - Master password -> PBKDF2-SHA256 (310k iters) -> AES-GCM-256 key
+   - Entire vault encrypted; only ciphertext is ever stored
+   - Nothing leaves this device
+   ============================================================ */
+
+const PBKDF2_ITERATIONS = 310000;
+const STORE_KEY = "vault.blob.v1";
+const AUTOLOCK_MS = 5 * 60 * 1000; // 5 minutes idle
+const CLIPBOARD_CLEAR_MS = 20000;  // wipe clipboard 20s after copy
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+// ---- storage shim (localStorage, with in-memory fallback) ----
+const store = (() => {
+  try { localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return localStorage; }
+  catch(e){ const m={}; return {getItem:k=>k in m?m[k]:null,setItem:(k,v)=>m[k]=v,removeItem:k=>delete m[k]}; }
+})();
+
+// ---- base64 helpers ----
+const b64 = {
+  enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf))),
+  dec: str => Uint8Array.from(atob(str), c => c.charCodeAt(0))
+};
+
+// ---- crypto core ----
+async function deriveKey(password, salt, iterations){
+  const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt, iterations, hash:"SHA-256" },
+    base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
+  );
+}
+
+async function encryptVault(obj, key){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = enc.encode(JSON.stringify(obj));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, data);
+  return { iv:b64.enc(iv), ct:b64.enc(ct) };
+}
+
+async function decryptVault(ivStr, ctStr, key){
+  const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:b64.dec(ivStr)}, key, b64.dec(ctStr));
+  return JSON.parse(dec.decode(pt));
+}
+
+// Build the full stored blob (salt + params + encrypted payload)
+async function packBlob(vaultObj, key, salt, iterations){
+  const { iv, ct } = await encryptVault(vaultObj, key);
+  return { v:1, kdf:"PBKDF2-SHA256", iterations, salt:b64.enc(salt), iv, ct };
+}
+
+// ============================================================
+//  App state
+// ============================================================
+let KEY = null;        // CryptoKey, held only in memory while unlocked
+let SALT = null;       // Uint8Array
+let VAULT = null;      // { entries:[...] }
+let autolockTimer = null;
+let clipboardTimer = null;
+let fileHandle = null;   // bound encrypted vault file (desktop), session-scoped
+let lastSeenCT = null;   // last ciphertext we wrote/read, to detect outside changes
+const supportsFS = ('showSaveFilePicker' in window) && ('showOpenFilePicker' in window);
+
+// ============================================================
+//  DOM
+// ============================================================
+const $ = id => document.getElementById(id);
+const lockScreen=$("lockScreen"), app=$("app");
+const masterPw=$("masterPw"), masterPw2=$("masterPw2"), confirmField=$("confirmField");
+const unlockBtn=$("unlockBtn"), lockErr=$("lockErr"), lockSub=$("lockSub"), pwLabel=$("pwLabel"), setupNote=$("setupNote");
+const strengthBar=$("strengthBar"), strengthLabel=$("strengthLabel");
+const listEl=$("list"), emptyEl=$("empty"), searchEl=$("search");
+
+const isFirstRun = () => !store.getItem(STORE_KEY);
+
+// ============================================================
+//  Lock screen logic
+// ============================================================
+function renderLockScreen(){
+  if(isFirstRun()){
+    lockSub.textContent = "Create a master password to protect your vault";
+    pwLabel.textContent = "New master password";
+    confirmField.classList.remove("hidden");
+    strengthBar.classList.remove("hidden");
+    strengthLabel.classList.remove("hidden");
+    unlockBtn.textContent = "Create vault";
+    setupNote.innerHTML = "⚠️ This password can't be recovered. If you forget it, your data is gone for good.";
+  } else {
+    lockSub.textContent = "Enter your master password to unlock";
+    pwLabel.textContent = "Master password";
+    confirmField.classList.add("hidden");
+    strengthBar.classList.add("hidden");
+    strengthLabel.classList.add("hidden");
+    unlockBtn.textContent = "Unlock";
+    setupNote.textContent = "";
+  }
+  lockErr.textContent="";
+  masterPw.value=""; masterPw2.value="";
+  setTimeout(()=>masterPw.focus(),50);
+}
+
+function scorePassword(pw){
+  let s=0;
+  if(pw.length>=8) s++;
+  if(pw.length>=12) s++;
+  if(pw.length>=16) s++;
+  if(/[a-z]/.test(pw)&&/[A-Z]/.test(pw)) s++;
+  if(/\d/.test(pw)) s++;
+  if(/[^A-Za-z0-9]/.test(pw)) s++;
+  return Math.min(s,5);
+}
+masterPw.addEventListener("input", ()=>{
+  if(!isFirstRun()) return;
+  const s = scorePassword(masterPw.value);
+  const pct=[0,15,35,55,78,100][s];
+  const colors=["#f05d5e","#f05d5e","#d29922","#d29922","#3fb950","#3fb950"];
+  const labels=["Too weak","Weak","Fair","Okay","Strong","Very strong"];
+  strengthBar.firstElementChild.style.width=pct+"%";
+  strengthBar.firstElementChild.style.background=colors[s];
+  strengthLabel.textContent = masterPw.value ? labels[s] : "";
+  strengthLabel.style.color = colors[s];
+});
+
+async function handleUnlock(){
+  lockErr.textContent="";
+  const pw = masterPw.value;
+  if(!pw){ lockErr.textContent="Enter a password."; return; }
+
+  if(isFirstRun()){
+    if(pw.length<8){ lockErr.textContent="Use at least 8 characters (longer is better)."; return; }
+    if(pw!==masterPw2.value){ lockErr.textContent="The two passwords don't match."; return; }
+    SALT = crypto.getRandomValues(new Uint8Array(16));
+    unlockBtn.disabled=true; unlockBtn.textContent="Encrypting…";
+    KEY = await deriveKey(pw, SALT, PBKDF2_ITERATIONS);
+    VAULT = { entries:[] };
+    await persist();
+    unlockBtn.disabled=false;
+    openApp();
+  } else {
+    unlockBtn.disabled=true; unlockBtn.textContent="Unlocking…";
+    try{
+      const blob = JSON.parse(store.getItem(STORE_KEY));
+      SALT = b64.dec(blob.salt);
+      KEY = await deriveKey(pw, SALT, blob.iterations||PBKDF2_ITERATIONS);
+      VAULT = await decryptVault(blob.iv, blob.ct, KEY); // throws if wrong password
+      openApp();
+    }catch(e){
+      lockErr.textContent="Wrong master password.";
+      KEY=null; VAULT=null;
+    }finally{
+      unlockBtn.disabled=false; unlockBtn.textContent="Unlock";
+    }
+  }
+}
+unlockBtn.addEventListener("click", handleUnlock);
+[masterPw,masterPw2].forEach(el=>el.addEventListener("keydown",e=>{if(e.key==="Enter")handleUnlock();}));
+
+// ============================================================
+//  Persist (re-encrypt whole vault)
+// ============================================================
+async function persist(){
+  const blob = await packBlob(VAULT, KEY, SALT, PBKDF2_ITERATIONS);
+  const text = JSON.stringify(blob);
+  store.setItem(STORE_KEY, text);            // fast per-device cache
+  lastSeenCT = blob.ct;
+  if(fileHandle){                            // also write the owned vault file
+    try{ await writeToHandle(text); }
+    catch(e){ toast("⚠ Couldn't write to the vault file"); }
+  }
+}
+async function writeToHandle(text){
+  const w = await fileHandle.createWritable();
+  await w.write(text);
+  await w.close();
+}
+
+// ============================================================
+//  App open / lock
+// ============================================================
+function openApp(){
+  lockScreen.classList.add("hidden");
+  app.classList.remove("hidden");
+  renderList();
+  updateSyncChip();
+  resetAutolock();
+}
+function lock(){
+  KEY=null; VAULT=null; SALT=null;
+  clearTimeout(autolockTimer);
+  app.classList.add("hidden");
+  lockScreen.classList.remove("hidden");
+  closeMenu(); closeModal();
+  renderLockScreen();
+}
+$("lockBtn").addEventListener("click", lock);
+
+function resetAutolock(){
+  clearTimeout(autolockTimer);
+  if(KEY) autolockTimer=setTimeout(lock, AUTOLOCK_MS);
+}
+["click","keydown","mousemove","touchstart"].forEach(ev=>document.addEventListener(ev, ()=>{ if(KEY) resetAutolock(); }, {passive:true}));
+
+// ============================================================
+//  Rendering the list
+// ============================================================
+function avatarColor(str){
+  let h=0; for(let i=0;i<str.length;i++) h=str.charCodeAt(i)+((h<<5)-h);
+  const hue=Math.abs(h)%360;
+  return `hsl(${hue} 55% 45%)`;
+}
+let activeCat = null;   // null = All, "" = Uncategorized, else a category name
+
+function allCategories(){
+  const set=new Set();
+  for(const e of (VAULT.entries||[])){ const c=(e.category||"").trim(); if(c) set.add(c); }
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+function renderCatBar(){
+  const bar=$("catbar");
+  const cats=allCategories();
+  const hasUncat=(VAULT.entries||[]).some(e=>!(e.category||"").trim());
+  // clear a filter that no longer exists
+  if(activeCat!==null && activeCat!=="" && !cats.includes(activeCat)) activeCat=null;
+  if(activeCat==="" && !hasUncat) activeCat=null;
+  bar.innerHTML="";
+  if(cats.length===0){ bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  const addPill=(label,val)=>{
+    const s=document.createElement("span");
+    s.className="catpill"+(activeCat===val?" on":"");
+    s.textContent=label;
+    s.addEventListener("click",()=>{ activeCat=val; renderList(); });
+    bar.appendChild(s);
+  };
+  addPill("All",null);
+  for(const c of cats) addPill(c,c);
+  if(hasUncat) addPill("Uncategorized","");
+}
+
+function renderList(){
+  renderCatBar();
+  const q = searchEl.value.trim().toLowerCase();
+  const entries = (VAULT.entries||[])
+    .map((e,i)=>({e,i}))
+    .filter(({e})=>{
+      if(activeCat!==null && (e.category||"").trim()!==activeCat) return false;
+      return !q || (e.title||"").toLowerCase().includes(q) || (e.username||"").toLowerCase().includes(q);
+    })
+    .sort((a,b)=> (a.e.title||"").localeCompare(b.e.title||""));
+
+  listEl.innerHTML="";
+  if((VAULT.entries||[]).length===0){
+    emptyEl.classList.remove("hidden");
+    $("emptyText").innerHTML="Your vault is empty.<br>Tap <b>+</b> to add your first login.";
+    return;
+  }
+  if(entries.length===0){
+    emptyEl.classList.remove("hidden");
+    $("emptyText").innerHTML = q ? "No matches for your search." : "Nothing in this category yet.";
+    return;
+  }
+  emptyEl.classList.add("hidden");
+
+  for(const {e,i} of entries){
+    const row=document.createElement("div");
+    row.className="entry";
+    const letter=(e.title||"?").trim().charAt(0).toUpperCase()||"?";
+    row.innerHTML=`
+      <div class="avatar" style="background:${avatarColor(e.title||'')}">${letter}</div>
+      <div class="meta">
+        <div class="t"></div>
+        <div class="u"></div>
+      </div>
+      <span class="cat-tag"></span>
+      <div class="quick">
+        <button class="iconbtn sm" data-act="user" title="Copy username">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+        <button class="iconbtn sm" data-act="pass" title="Copy password">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+      </div>`;
+    row.querySelector(".t").textContent = e.title||"(untitled)";
+    row.querySelector(".u").textContent = e.username||"—";
+    const catTag=row.querySelector(".cat-tag");
+    const cat=(e.category||"").trim();
+    if(cat && activeCat===null) catTag.textContent=cat; else catTag.remove();
+    row.addEventListener("click", ev=>{
+      const act = ev.target.closest("[data-act]")?.dataset.act;
+      if(act==="user"){ ev.stopPropagation(); copyToClipboard(e.username,"Username copied"); return; }
+      if(act==="pass"){ ev.stopPropagation(); copyToClipboard(e.password,"Password copied",true); return; }
+      openDetail(i);
+    });
+    listEl.appendChild(row);
+  }
+}
+searchEl.addEventListener("input", renderList);
+
+// ============================================================
+//  Clipboard (with auto-clear for secrets)
+// ============================================================
+async function copyToClipboard(text, msg, isSecret){
+  if(text==null||text===""){ toast("Nothing to copy"); return; }
+  try{
+    await navigator.clipboard.writeText(text);
+    toast(msg + (isSecret ? ` · clears in ${CLIPBOARD_CLEAR_MS/1000}s` : ""));
+    if(isSecret){
+      clearTimeout(clipboardTimer);
+      clipboardTimer=setTimeout(async ()=>{
+        try{ const cur=await navigator.clipboard.readText(); if(cur===text) await navigator.clipboard.writeText(""); }
+        catch(_){ try{ await navigator.clipboard.writeText(""); }catch(__){} }
+      }, CLIPBOARD_CLEAR_MS);
+    }
+  }catch(e){
+    // Fallback for browsers blocking clipboard API
+    const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast(msg); }catch(_){ toast("Couldn't copy"); }
+    document.body.removeChild(ta);
+  }
+}
+
+// ============================================================
+//  Toast
+// ============================================================
+let toastTimer=null;
+function toast(msg){
+  const t=$("toast");
+  t.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${msg}`;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
+}
+
+// ============================================================
+//  Entry detail / edit modal
+// ============================================================
+function closeModal(){ document.querySelectorAll(".overlay").forEach(o=>o.remove()); }
+
+function openDetail(index){
+  const e = VAULT.entries[index];
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`
+    <div class="modal">
+      <header>
+        <div class="avatar" style="width:34px;height:34px;font-size:15px;background:${avatarColor(e.title||'')}">${(e.title||'?').charAt(0).toUpperCase()}</div>
+        <h2></h2>
+        <button class="iconbtn" data-x>&times;</button>
+      </header>
+      <div class="body">
+        <div class="detail-row"><span class="dr-label">User</span><span class="dr-val" id="dUser"></span><button class="iconbtn sm" data-copy="user" title="Copy">⧉</button></div>
+        <div class="detail-row"><span class="dr-label">Password</span><span class="dr-val mono" id="dPass">••••••••</span><button class="iconbtn sm" data-rev title="Show/Hide">👁</button><button class="iconbtn sm" data-copy="pass" title="Copy">⧉</button></div>
+        <div class="detail-row" id="catRow"><span class="dr-label">Category</span><span class="dr-val" id="dCat"></span></div>
+        <div class="detail-row" id="urlRow"><span class="dr-label">URL</span><span class="dr-val"><a id="dUrl" target="_blank" rel="noopener"></a></span></div>
+        <div class="detail-row" id="noteRow"><span class="dr-label">Notes</span><span class="dr-val" id="dNote" style="white-space:pre-wrap"></span></div>
+      </div>
+      <footer>
+        <button class="btn danger sm" data-del>Delete</button>
+        <button class="btn sm" data-edit>Edit</button>
+      </footer>
+    </div>`;
+  ov.querySelector("h2").textContent=e.title||"(untitled)";
+  ov.querySelector("#dUser").textContent=e.username||"—";
+  if((e.category||"").trim()) ov.querySelector("#dCat").textContent=e.category.trim(); else ov.querySelector("#catRow").style.display="none";
+  const dUrl=ov.querySelector("#dUrl");
+  if(e.url){ let u=e.url; if(!/^https?:\/\//i.test(u)) u="https://"+u; dUrl.href=u; dUrl.textContent=e.url; }
+  else ov.querySelector("#urlRow").style.display="none";
+  if(e.notes) ov.querySelector("#dNote").textContent=e.notes; else ov.querySelector("#noteRow").style.display="none";
+
+  let revealed=false;
+  ov.querySelector("[data-rev]").addEventListener("click",()=>{
+    revealed=!revealed;
+    ov.querySelector("#dPass").textContent = revealed ? (e.password||"—") : "••••••••";
+  });
+  ov.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",()=>{
+    if(b.dataset.copy==="user") copyToClipboard(e.username,"Username copied");
+    else copyToClipboard(e.password,"Password copied",true);
+  }));
+  ov.querySelector("[data-del]").addEventListener("click",()=>{ closeModal(); confirmDelete(index); });
+  ov.querySelector("[data-edit]").addEventListener("click",()=>{ closeModal(); openEditor(index); });
+  ov.querySelector("[data-x]").addEventListener("click",closeModal);
+  ov.addEventListener("click",ev=>{ if(ev.target===ov) closeModal(); });
+  document.body.appendChild(ov);
+}
+
+function confirmDelete(index){
+  const e=VAULT.entries[index];
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal" style="max-width:380px">
+    <div class="body"><p style="font-size:15px;line-height:1.5">Delete <b></b>? This can't be undone.</p></div>
+    <footer><button class="btn ghost sm" data-x>Cancel</button><button class="btn danger sm" data-ok>Delete</button></footer>
+  </div>`;
+  ov.querySelector("b").textContent=e.title||"this entry";
+  ov.querySelector("[data-x]").addEventListener("click",closeModal);
+  ov.querySelector("[data-ok]").addEventListener("click",async()=>{
+    VAULT.entries.splice(index,1); await persist(); renderList(); closeModal(); toast("Deleted");
+  });
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov);
+}
+
+function openEditor(index){
+  const isNew = index==null;
+  const e = isNew ? {title:"",username:"",password:"",url:"",notes:"",category:""} : {...VAULT.entries[index]};
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`
+    <div class="modal">
+      <header><h2>${isNew?"Add login":"Edit login"}</h2><button class="iconbtn" data-x>&times;</button></header>
+      <div class="body">
+        <div class="field"><label>Name / Site</label><input class="input" id="fTitle" placeholder="e.g. Gmail" autocomplete="off"></div>
+        <div class="field"><label>Username / Email</label><input class="input" id="fUser" placeholder="you@example.com" autocomplete="off"></div>
+        <div class="field">
+          <label>Password</label>
+          <div class="pw-input-wrap">
+            <input class="input" id="fPass" type="password" autocomplete="off">
+            <div class="pw-tools">
+              <button data-rev title="Show/Hide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button data-gen title="Generate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+            </div>
+          </div>
+          <div class="gen hidden" id="genBox">
+            <div class="out" id="genOut"></div>
+            <div class="ctrl"><span>Length</span><input type="range" id="genLen" min="8" max="64" value="20"><b id="genLenVal">20</b></div>
+            <div class="chips">
+              <span class="chip on" data-opt="upper">A-Z</span>
+              <span class="chip on" data-opt="lower">a-z</span>
+              <span class="chip on" data-opt="num">0-9</span>
+              <span class="chip on" data-opt="sym">!@#</span>
+            </div>
+            <button class="btn sm block" id="genUse" style="margin-top:12px">Use this password</button>
+          </div>
+        </div>
+        <div class="field"><label>Category (optional)</label><input class="input" id="fCat" list="catList" placeholder="e.g. Work, Personal, Finance" autocomplete="off"><datalist id="catList"></datalist></div>
+        <div class="field"><label>URL (optional)</label><input class="input" id="fUrl" placeholder="example.com" autocomplete="off"></div>
+        <div class="field"><label>Notes (optional)</label><textarea class="input" id="fNotes" placeholder="Recovery codes, security questions…"></textarea></div>
+      </div>
+      <footer><button class="btn ghost" data-x>Cancel</button><button class="btn" data-save>Save</button></footer>
+    </div>`;
+  const q=s=>ov.querySelector(s);
+  q("#fTitle").value=e.title; q("#fUser").value=e.username; q("#fPass").value=e.password; q("#fUrl").value=e.url; q("#fNotes").value=e.notes; q("#fCat").value=e.category||"";
+  // suggest existing categories
+  for(const c of allCategories()){ const o=document.createElement("option"); o.value=c; q("#catList").appendChild(o); }
+
+  // show/hide
+  q("[data-rev]").addEventListener("click",()=>{ const p=q("#fPass"); p.type=p.type==="password"?"text":"password"; });
+
+  // generator
+  const genBox=q("#genBox");
+  q("[data-gen]").addEventListener("click",()=>{ genBox.classList.toggle("hidden"); if(!genBox.classList.contains("hidden")) regen(); });
+  const opts={upper:true,lower:true,num:true,sym:true};
+  ov.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{
+    const k=c.dataset.opt;
+    if(opts[k] && Object.values(opts).filter(Boolean).length===1) return; // keep at least one
+    opts[k]=!opts[k]; c.classList.toggle("on",opts[k]); regen();
+  }));
+  q("#genLen").addEventListener("input",e2=>{ q("#genLenVal").textContent=e2.target.value; regen(); });
+  function regen(){ q("#genOut").textContent = genPassword(+q("#genLen").value, opts); }
+  q("#genUse").addEventListener("click",()=>{ q("#fPass").value=q("#genOut").textContent; q("#fPass").type="text"; genBox.classList.add("hidden"); });
+
+  // save
+  q("[data-save]").addEventListener("click",async()=>{
+    const obj={ title:q("#fTitle").value.trim(), username:q("#fUser").value.trim(), password:q("#fPass").value, url:q("#fUrl").value.trim(), notes:q("#fNotes").value, category:q("#fCat").value.trim() };
+    if(!obj.title && !obj.username && !obj.password){ toast("Add at least a name or password"); return; }
+    if(isNew) VAULT.entries.push(obj); else VAULT.entries[index]=obj;
+    await persist(); renderList(); closeModal(); toast(isNew?"Login added":"Saved");
+  });
+  ov.querySelectorAll("[data-x]").forEach(b=>b.addEventListener("click",closeModal));
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov);
+  setTimeout(()=>q("#fTitle").focus(),50);
+}
+$("addBtn").addEventListener("click",()=>openEditor(null));
+
+// ============================================================
+//  Password generator (crypto-random, unbiased)
+// ============================================================
+function genPassword(len, opts){
+  let pool="";
+  if(opts.upper) pool+="ABCDEFGHJKLMNPQRSTUVWXYZ";      // no I,O
+  if(opts.lower) pool+="abcdefghijkmnpqrstuvwxyz";       // no l,o
+  if(opts.num)   pool+="23456789";                       // no 0,1
+  if(opts.sym)   pool+="!@#$%^&*()-_=+[]{};:,.?";
+  if(!pool) pool="abcdefghijkmnpqrstuvwxyz";
+  const out=[]; const n=pool.length; const max=Math.floor(256/n)*n;
+  while(out.length<len){
+    const buf=crypto.getRandomValues(new Uint8Array(len*2));
+    for(const byte of buf){ if(out.length>=len) break; if(byte<max) out.push(pool[byte%n]); }
+  }
+  return out.join("");
+}
+
+// ============================================================
+//  Menu: export / import / change password / wipe
+// ============================================================
+const menu=$("menu");
+function closeMenu(){ menu.classList.add("hidden"); }
+$("menuBtn").addEventListener("click",e=>{ e.stopPropagation(); menu.classList.toggle("hidden"); });
+document.addEventListener("click",()=>closeMenu());
+menu.addEventListener("click",e=>e.stopPropagation());
+
+$("exportBtn").addEventListener("click",async()=>{
+  closeMenu();
+  const blob = store.getItem(STORE_KEY);
+  const filename=`vault-backup-${new Date().toISOString().slice(0,10)}.json`;
+  // When running as a published artifact, saving goes through the host's
+  // download capability (viewer confirms). Opened as a local file, that
+  // capability is absent, so fall back to a normal browser download.
+  let downloads=null;
+  try{ if(window.claude&&claude.use) downloads=await claude.use("downloads"); }catch(_){}
+  if(downloads){
+    try{
+      await downloads.save({filename, data:blob});
+      toast("Encrypted backup saved");
+    }catch(err){
+      if(err&&err.code==="declined") return; // viewer cancelled
+      toast("Couldn't save backup");
+    }
+  }else{
+    const file=new Blob([blob],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(file);
+    a.download=filename;
+    a.click(); URL.revokeObjectURL(a.href);
+    toast("Encrypted backup downloaded");
+  }
+});
+
+$("importBtn").addEventListener("click",()=>{ closeMenu(); $("fileInput").click(); });
+$("fileInput").addEventListener("change",async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  $("fileInput").value="";
+  try{
+    const text=await file.text();
+    const blob=JSON.parse(text);
+    if(!blob.ct||!blob.salt||!blob.iv) throw new Error("not a vault file");
+    // Try to decrypt with CURRENT key first (same master password)
+    let imported=null;
+    try{
+      const k=await deriveKey_fromPrompt_or_current(blob);
+      imported=await decryptVault(blob.iv, blob.ct, k);
+    }catch(_){ throw new Error("decrypt"); }
+    // merge, skip exact duplicates
+    const sig=x=>`${x.title}|${x.username}|${x.password}`;
+    const have=new Set(VAULT.entries.map(sig));
+    let added=0;
+    for(const it of (imported.entries||[])){ if(!have.has(sig(it))){ VAULT.entries.push(it); added++; } }
+    await persist(); renderList();
+    toast(`Imported ${added} new login${added===1?"":"s"}`);
+  }catch(err){
+    importWithPassword(e);
+  }
+});
+
+// Import path when the backup used a DIFFERENT master password
+async function deriveKey_fromPrompt_or_current(blob){
+  // first attempt: current session key works only if salt+pw match; just reuse current KEY is wrong (different salt)
+  const salt=b64.dec(blob.salt);
+  // we can't reuse KEY (bound to our salt); ask nothing here — caller handles failure
+  throw new Error("need-password");
+}
+
+function importWithPassword(changeEvt){
+  // Re-read the file via a fresh prompt modal asking for that backup's password
+  const file = changeEvt.target.files && changeEvt.target.files[0];
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal" style="max-width:400px">
+    <header><h2>Unlock backup</h2><button class="iconbtn" data-x>&times;</button></header>
+    <div class="body">
+      <p class="muted" style="font-size:13px;margin-bottom:14px">Enter the master password that was used for this backup file.</p>
+      <input class="input" type="password" id="impPw" placeholder="Backup master password" autocomplete="off">
+      <div class="err" id="impErr"></div>
+    </div>
+    <footer><button class="btn ghost" data-x>Cancel</button><button class="btn" data-ok>Import</button></footer>
+  </div>`;
+  const q=s=>ov.querySelector(s);
+  q("[data-x]").addEventListener("click",closeModal);
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov);
+  setTimeout(()=>q("#impPw").focus(),50);
+  const go=async()=>{
+    try{
+      const text=await file.text(); const blob=JSON.parse(text);
+      const salt=b64.dec(blob.salt);
+      const k=await deriveKey(q("#impPw").value, salt, blob.iterations||PBKDF2_ITERATIONS);
+      const imported=await decryptVault(blob.iv, blob.ct, k);
+      const sig=x=>`${x.title}|${x.username}|${x.password}`;
+      const have=new Set(VAULT.entries.map(sig));
+      let added=0;
+      for(const it of (imported.entries||[])){ if(!have.has(sig(it))){ VAULT.entries.push(it); added++; } }
+      await persist(); renderList(); closeModal();
+      toast(`Imported ${added} new login${added===1?"":"s"}`);
+    }catch(e){ q("#impErr").textContent="Wrong password or invalid file."; }
+  };
+  q("[data-ok]").addEventListener("click",go);
+  q("#impPw").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
+}
+
+$("changePwBtn").addEventListener("click",()=>{
+  closeMenu();
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal" style="max-width:400px">
+    <header><h2>Change master password</h2><button class="iconbtn" data-x>&times;</button></header>
+    <div class="body">
+      <div class="field"><label>Current password</label><input class="input" type="password" id="cpOld" autocomplete="off"></div>
+      <div class="field"><label>New password</label><input class="input" type="password" id="cpNew" autocomplete="off"></div>
+      <div class="field"><label>Confirm new password</label><input class="input" type="password" id="cpNew2" autocomplete="off"></div>
+      <div class="err" id="cpErr"></div>
+    </div>
+    <footer><button class="btn ghost" data-x>Cancel</button><button class="btn" data-ok>Change</button></footer>
+  </div>`;
+  const q=s=>ov.querySelector(s);
+  q("[data-x]").addEventListener("click",closeModal);
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov);
+  q("[data-ok]").addEventListener("click",async()=>{
+    const blob=JSON.parse(store.getItem(STORE_KEY));
+    try{
+      const oldKey=await deriveKey(q("#cpOld").value, b64.dec(blob.salt), blob.iterations||PBKDF2_ITERATIONS);
+      await decryptVault(blob.iv, blob.ct, oldKey); // verify
+    }catch(e){ q("#cpErr").textContent="Current password is wrong."; return; }
+    const np=q("#cpNew").value;
+    if(np.length<8){ q("#cpErr").textContent="New password needs 8+ characters."; return; }
+    if(np!==q("#cpNew2").value){ q("#cpErr").textContent="New passwords don't match."; return; }
+    SALT=crypto.getRandomValues(new Uint8Array(16));
+    KEY=await deriveKey(np, SALT, PBKDF2_ITERATIONS);
+    await persist(); closeModal(); toast("Master password changed");
+  });
+});
+
+$("wipeBtn").addEventListener("click",()=>{
+  closeMenu();
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal" style="max-width:400px">
+    <header><h2 style="color:var(--danger)">Delete everything</h2><button class="iconbtn" data-x>&times;</button></header>
+    <div class="body"><p style="font-size:14px;line-height:1.55">This erases your entire vault from this browser permanently. Make sure you've exported a backup first if you want to keep your data.<br><br>Type <b>DELETE</b> to confirm.</p>
+      <input class="input" id="wipeConf" placeholder="DELETE" autocomplete="off" style="margin-top:12px">
+    </div>
+    <footer><button class="btn ghost" data-x>Cancel</button><button class="btn danger" data-ok>Erase vault</button></footer>
+  </div>`;
+  const q=s=>ov.querySelector(s);
+  q("[data-x]").addEventListener("click",closeModal);
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov);
+  q("[data-ok]").addEventListener("click",()=>{
+    if(q("#wipeConf").value!=="DELETE"){ q("#wipeConf").style.borderColor="var(--danger)"; return; }
+    store.removeItem(STORE_KEY); lock();
+  });
+});
+
+// ============================================================
+//  Own-your-file: link / open an encrypted vault file (desktop)
+// ============================================================
+function updateSyncChip(){
+  const chip=$("syncChip"); const name=chip.querySelector(".name");
+  chip.style.display="inline-flex";
+  if(fileHandle){ chip.classList.add("linked"); name.textContent=fileHandle.name||"vault file"; }
+  else{ chip.classList.remove("linked"); name.textContent="This device only"; }
+}
+
+async function linkVaultFile(){
+  closeMenu();
+  if(!supportsFS){ $("exportBtn").click(); return; }
+  try{
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName:"vault.json",
+      types:[{description:"Encrypted vault",accept:{"application/json":[".json",".vault"]}}]
+    });
+    await persist();            // writes current vault into the chosen file
+    updateSyncChip();
+    toast("Linked — changes now auto-save to this file");
+  }catch(e){ if(e.name!=="AbortError") toast("Couldn't link the file"); }
+}
+
+async function openVaultFile(){
+  closeMenu();
+  if(!supportsFS){ $("importBtn").click(); return; }
+  try{
+    const [h] = await window.showOpenFilePicker({
+      types:[{description:"Encrypted vault",accept:{"application/json":[".json",".vault"]}}]
+    });
+    const text = await (await h.getFile()).text();
+    const blob = JSON.parse(text);
+    if(!blob.ct||!blob.salt||!blob.iv){ toast("That isn't a vault file"); return; }
+    promptFilePassword(blob, async (key,salt,vault)=>{
+      fileHandle=h; KEY=key; SALT=salt; VAULT=vault;
+      await persist();          // aligns the per-device cache to this file
+      renderList(); updateSyncChip();
+      toast("Vault file opened — auto-saving to it");
+    });
+  }catch(e){ if(e.name!=="AbortError") toast("Couldn't open the file"); }
+}
+
+// Shared "enter the password for this file" modal
+function promptFilePassword(blob, onOk){
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal" style="max-width:400px">
+    <header><h2>Unlock vault file</h2><button class="iconbtn" data-x>&times;</button></header>
+    <div class="body"><p class="muted" style="font-size:13px;margin-bottom:14px">Enter the master password for this vault file.</p>
+    <input class="input" type="password" id="fpPw" placeholder="Master password" autocomplete="off"><div class="err" id="fpErr"></div></div>
+    <footer><button class="btn ghost" data-x>Cancel</button><button class="btn" data-ok>Open</button></footer></div>`;
+  const q=s=>ov.querySelector(s);
+  q("[data-x]").addEventListener("click",closeModal);
+  ov.addEventListener("click",ev=>{if(ev.target===ov)closeModal();});
+  document.body.appendChild(ov); setTimeout(()=>q("#fpPw").focus(),50);
+  const go=async()=>{
+    try{
+      const salt=b64.dec(blob.salt);
+      const key=await deriveKey(q("#fpPw").value, salt, blob.iterations||PBKDF2_ITERATIONS);
+      const vault=await decryptVault(blob.iv, blob.ct, key);
+      closeModal(); onOk(key,salt,vault);
+    }catch(e){ q("#fpErr").textContent="Wrong password or invalid file."; }
+  };
+  q("[data-ok]").addEventListener("click",go);
+  q("#fpPw").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
+}
+
+// Pick up edits made on another device (same file via your cloud drive)
+async function reconcileFromFile(){
+  if(!fileHandle||!KEY) return;
+  try{
+    const text=await (await fileHandle.getFile()).text();
+    const blob=JSON.parse(text);
+    if(!blob.ct || blob.ct===lastSeenCT) return;   // unchanged since we last touched it
+    try{
+      const vault=await decryptVault(blob.iv, blob.ct, KEY);
+      VAULT=vault; lastSeenCT=blob.ct; renderList(); toast("Updated from your vault file");
+    }catch(_){
+      promptFilePassword(blob, async (key,salt,vault)=>{
+        KEY=key; SALT=salt; VAULT=vault; await persist(); renderList();
+      });
+    }
+  }catch(_){}
+}
+window.addEventListener("focus", ()=>{ if(KEY) reconcileFromFile(); });
+
+$("linkFileBtn").addEventListener("click",linkVaultFile);
+$("openFileBtn").addEventListener("click",openVaultFile);
+if(!supportsFS){ $("linkFileBtn").style.display="none"; $("openFileBtn").style.display="none"; }
+
+// ============================================================
+//  Installable home-screen app (manifest built in-page)
+// ============================================================
+(function(){
+  const icon="data:image/svg+xml,"+encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='#0e1116'/><g fill='none' stroke='#4f8cff' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'><rect x='46' y='84' width='88' height='60' rx='12'/><path d='M66 84V66a24 24 0 0 1 48 0v18'/></g></svg>");
+  const manifest={name:"Vault — Password Manager",short_name:"Vault",display:"standalone",
+    background_color:"#0e1116",theme_color:"#0e1116",start_url:".",
+    icons:[{src:icon,sizes:"180x180",type:"image/svg+xml",purpose:"any"}]};
+  try{
+    const url=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"}));
+    $("manifestLink").href=url;
+  }catch(_){}
+})();
+
+// ============================================================
+//  Boot
+// ============================================================
+renderLockScreen();
+</script>
+</body>
+</html>
